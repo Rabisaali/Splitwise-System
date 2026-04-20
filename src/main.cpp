@@ -63,7 +63,8 @@ SplitType readSplitType() {
             if (choice == 1) return SplitType::EQUAL;
             if (choice == 2) return SplitType::EXACT;
             if (choice == 3) return SplitType::PERCENTAGE;
-        } else {
+        }
+        else {
             cin.clear();
             cin.ignore(numeric_limits<streamsize>::max(), '\n');
         }
@@ -113,17 +114,20 @@ int main() {
                 string email = readLine("Enter user email: ");
                 User* user = manager->createUser(name, email);
                 cout << "User created with ID: " << user->userID << "\n";
-            } else if (choice == 2) {
+            } 
+            else if (choice == 2) {
                 // Create a new group.
                 string groupName = readLine("Enter group name: ");
                 Group* group = manager->createGroup(groupName);
                 cout << "Group created with ID: " << group->groupID << "\n";
-            } else if (choice == 3) {
+            } 
+            else if (choice == 3) {
                 // Add an existing user to an existing group.
                 string userID = readLine("Enter user ID: ");
                 string groupID = readLine("Enter group ID: ");
                 manager->addUserToGroup(userID, groupID);
-            } else if (choice == 4) {
+            } 
+            else if (choice == 4) {
                 // Add a group expense with selected split type.
                 string groupID = readLine("Enter group ID: ");
                 string description = readLine("Enter expense description: ");
@@ -151,54 +155,64 @@ int main() {
                 }
 
                 manager->addExpenseToGroup(groupID, description, amount, paidByUserID, involvedUsers, splitType, splitValues);
-            } else if (choice == 5) {
+            } 
+            else if (choice == 5) {
                 // Add expense between two users only.
                 string description = readLine("Enter expense description: ");
                 double amount = readPositiveDouble("Enter total amount: ");
                 string paidByUserID = readLine("Enter payer user ID: ");
                 string toUserID = readLine("Enter other user ID: ");
                 manager->addIndividualExpense(description, amount, paidByUserID, toUserID, SplitType::EQUAL);
-            } else if (choice == 6) {
+            } 
+            else if (choice == 6) {
                 // Record settlement payment inside a group.
                 string groupID = readLine("Enter group ID: ");
                 string fromUserID = readLine("Enter from user ID: ");
                 string toUserID = readLine("Enter to user ID: ");
                 double amount = readPositiveDouble("Enter amount: ");
                 manager->settlePaymentInGroup(groupID, fromUserID, toUserID, amount);
-            } else if (choice == 7) {
+            } 
+            else if (choice == 7) {
                 // Record direct settlement between two users.
                 string fromUserID = readLine("Enter from user ID: ");
                 string toUserID = readLine("Enter to user ID: ");
                 double amount = readPositiveDouble("Enter amount: ");
                 manager->settleIndividualPayment(fromUserID, toUserID, amount);
-            } else if (choice == 8) {
+            } 
+            else if (choice == 8) {
                 // Show summary and detailed balance for one user.
                 string userID = readLine("Enter user ID: ");
                 manager->showUserBalance(userID);
-            } else if (choice == 9) {
+            } 
+            else if (choice == 9) {
                 // Show all balances in one group.
                 string groupID = readLine("Enter group ID: ");
                 manager->showGroupBalances(groupID);
-            } else if (choice == 10) {
+            } 
+            else if (choice == 10) {
                 // Simplify debt graph in selected group.
                 string groupID = readLine("Enter group ID: ");
                 manager->simplifyGroupDebts(groupID);
-            } else if (choice == 11) {
+            } 
+            else if (choice == 11) {
                 // Remove user only if they have no pending balance in group.
                 string userID = readLine("Enter user ID: ");
                 string groupID = readLine("Enter group ID: ");
                 manager->removeUserFromGroup(userID, groupID);
-            } else if (choice == 12) {
+            } 
+            else if (choice == 12) {
                 // Save current in-memory data to a file.
                 string fileName = readLine("Enter file path to save data: ");
                 manager->saveToFile(fileName);
                 cout << "Data saved successfully.\n";
-            } else if (choice == 13) {
+            } 
+            else if (choice == 13) {
                 // Load data from a saved file.
                 string fileName = readLine("Enter file path to load data: ");
                 manager->loadFromFile(fileName);
                 cout << "Data loaded successfully.\n";
-            } else {
+            } 
+            else {
                 cout << "Invalid menu choice.\n";
             }
         } catch (exception& ex) {
