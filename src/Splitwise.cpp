@@ -11,14 +11,19 @@
 using namespace std;
 
 namespace {
+// Small tolerance used for floating-point comparisons.
+// Example: 99.999 and 100.000 are treated as equal within this margin.
 const double EPS = 0.01;
 
+// function to ensure amounts are always positive.
 void validatePositiveAmount(double amount) {
     if (amount <= 0.0) {
         throw runtime_error("Amount must be positive");
     }
 }
 
+// Converts number from file to enum.
+// a data type consisting of named values like elements, members, etc., that represent integral constants
 SplitType intToSplitType(int value) {
     if (value == 1) return SplitType::EQUAL;
     if (value == 2) return SplitType::EXACT;
@@ -26,16 +31,19 @@ SplitType intToSplitType(int value) {
     throw runtime_error("Invalid split type");
 }
 
+// Converts enum to number for file storage.
 int splitTypeToInt(SplitType type) {
     return static_cast<int>(type);
 }
 }
 
+// Static counters for auto-generated IDs.
 int User::nextUserID = 0;
 int Expense::nextExpenseID = 0;
 int Group::nextGroupID = 0;
 Splitwise* Splitwise::instance = nullptr;
 
+// One split entry means: this user should pay this amount in an expense.
 Split::Split(string userID, double amount) {
     this->userID = userID;
     this->amount = amount;
@@ -47,6 +55,7 @@ vector<Split> EqualSplit::calculateSplit(double totalAmount, vector<string> user
     }
 
     vector<Split> splits;
+    // Equal split: everyone gets same share.
     const double amountPerUser = totalAmount / static_cast<double>(userIDs.size());
     for (string userID : userIDs) {
         splits.push_back(Split(userID, amountPerUser));
@@ -60,6 +69,7 @@ vector<Split> ExactSplit::calculateSplit(double totalAmount, vector<string> user
     }
 
     const double sum = accumulate(values.begin(), values.end(), 0.0);
+    // Exact split must fully match total amount.
     if (abs(sum - totalAmount) > EPS) {
         throw runtime_error("Exact split values must add up to total amount");
     }
@@ -77,6 +87,7 @@ vector<Split> PercentageSplit::calculateSplit(double totalAmount, vector<string>
     }
 
     const double sum = accumulate(values.begin(), values.end(), 0.0);
+    // Percentage split values must total 100.
     if (abs(sum - 100.0) > EPS) {
         throw runtime_error("Percentage split values must add up to 100");
     }
@@ -90,6 +101,7 @@ vector<Split> PercentageSplit::calculateSplit(double totalAmount, vector<string>
 }
 
 SplitStrategy* SplitFactory::getSplitStrategy(SplitType type) {
+    // Factory chooses strategy object based on split type.
     if (type == SplitType::EQUAL) return new EqualSplit();
     if (type == SplitType::EXACT) return new ExactSplit();
     if (type == SplitType::PERCENTAGE) return new PercentageSplit();
@@ -97,6 +109,7 @@ SplitStrategy* SplitFactory::getSplitStrategy(SplitType type) {
 }
 
 User::User(string name, string email) {
+    // IDs are generated as user1, user2, ...
     userID = "user" + to_string(++nextUserID);
     this->name = name;
     this->email = email;
@@ -107,7 +120,13 @@ void User::update(string message) {
 }
 
 void User::updateBalance(string otherUserID, double amount) {
+    // balances is a map:
+    // key   -> other user ID
+    // value -> money relation with that user
+    // positive: other user owes this user
+    // negative: this user owes other user
     balances[otherUserID] += amount;
+    // Remove near-zero balance to keep map clean.
     if (abs(balances[otherUserID]) < EPS) {
         balances.erase(otherUserID);
     }
@@ -134,6 +153,7 @@ double User::getTotalOwing() {
 }
 
 Expense::Expense(string description, double amount, string paidByUserID, vector<Split> splits, string groupID, vector<string> involvedUsers, SplitType splitType, vector<double> splitValues) {
+    // IDs are generated as expense1, expense2, ...
     expenseID = "expense" + to_string(++nextExpenseID);
     this->description = description;
     this->totalAmount = amount;
@@ -146,6 +166,13 @@ Expense::Expense(string description, double amount, string paidByUserID, vector<
 }
 
 map<string, map<string, double>> DebtSimplifier::simplifyDebt(map<string, map<string, double>> groupBalances) {
+    // groupBalances is a nested map:
+    // outer key   -> a user
+    // inner key   -> another user
+    // inner value -> balance relation between the two users
+    //
+    // Purpose: store pairwise debts for all members of a group.
+    // We convert this to net amounts and then rebuild a smaller set of debts.
     map<string, double> netAmounts;
     for (auto& userBalance : groupBalances) {
         netAmounts[userBalance.first] = 0;
@@ -165,6 +192,8 @@ map<string, map<string, double>> DebtSimplifier::simplifyDebt(map<string, map<st
 
     vector<pair<string, double>> creditors;
     vector<pair<string, double>> debtors;
+    // Users with positive net amount are creditors (they should receive money).
+    // Users with negative net amount are debtors (they should pay money).
     for (auto& net : netAmounts) {
         if (net.second > EPS) creditors.push_back({net.first, net.second});
         else if (net.second < -EPS) debtors.push_back({net.first, -net.second});
@@ -178,11 +207,14 @@ map<string, map<string, double>> DebtSimplifier::simplifyDebt(map<string, map<st
     });
 
     map<string, map<string, double>> simplifiedBalances;
+    // Initialize empty structure with all users.
     for (auto& userBalance : groupBalances) {
         simplifiedBalances[userBalance.first] = map<string, double>();
     }
 
     size_t i = 0, j = 0;
+    // Greedy matching: largest creditor with largest debtor.
+    // This reduces number of transactions while preserving final result.
     while (i < creditors.size() && j < debtors.size()) {
         string creditorID = creditors[i].first;
         string debtorID = debtors[j].first;
@@ -202,6 +234,7 @@ map<string, map<string, double>> DebtSimplifier::simplifyDebt(map<string, map<st
 }
 
 User* Group::getUserByUserID(string userID) {
+    // Linear search in group member list.
     for (User* member : members) {
         if (member->userID == userID) {
             return member;
@@ -211,6 +244,7 @@ User* Group::getUserByUserID(string userID) {
 }
 
 Group::Group(string name) {
+    // IDs are generated as group1, group2, ...
     groupID = "group" + to_string(++nextGroupID);
     this->name = name;
 }
@@ -223,6 +257,8 @@ Group::~Group() {
 
 void Group::addMember(User* user) {
     members.push_back(user);
+    // groupBalances map tracks debts inside this group only.
+    // Create empty inner map for new member.
     groupBalances[user->userID] = map<string, double>();
     cout << user->name << " added to group " << name << endl;
 }
@@ -252,13 +288,18 @@ void Group::notifyMembers(string message) {
 }
 
 bool Group::isMember(string userID) {
+    // Checking membership by key existence in groupBalances map.
     return groupBalances.find(userID) != groupBalances.end();
 }
 
 void Group::updateGroupBalance(string fromUserID, string toUserID, double amount) {
+    // Nested map purpose:
+    // groupBalances[A][B] means how much B owes A.
+    // store mirrored entries so both directions stay consistent.
     groupBalances[fromUserID][toUserID] += amount;
     groupBalances[toUserID][fromUserID] -= amount;
 
+    // Remove almost-zero entries to avoid clutter.
     if (abs(groupBalances[fromUserID][toUserID]) < EPS) groupBalances[fromUserID].erase(toUserID);
     if (abs(groupBalances[toUserID][fromUserID]) < EPS) groupBalances[toUserID].erase(fromUserID);
 }
@@ -293,13 +334,16 @@ bool Group::addExpense(string description, double amount, string paidByUserID, v
         }
     }
 
+    // Choose strategy at runtime (equal/exact/percentage).
     SplitStrategy* strategy = SplitFactory::getSplitStrategy(splitType);
     vector<Split> splits = strategy->calculateSplit(amount, involvedUsers, splitValues);
     delete strategy;
 
+    // Save expense in group map by expense ID.
     Expense* expense = new Expense(description, amount, paidByUserID, splits, groupID, involvedUsers, splitType, splitValues);
     groupExpenses[expense->expenseID] = expense;
 
+    // For each participant (except payer), update group debt towards payer.
     for (Split& split : splits) {
         if (split.userID != paidByUserID) {
             updateGroupBalance(paidByUserID, split.userID, split.amount);
@@ -317,6 +361,7 @@ bool Group::settlePayment(string fromUserID, string toUserID, double amount) {
         return false;
     }
 
+    // Settlement directly adjusts pairwise balances.
     updateGroupBalance(fromUserID, toUserID, amount);
     notifyMembers("Settlement made: " + fromUserID + " paid " + toUserID + " Rs " + to_string(amount));
     return true;
@@ -330,6 +375,8 @@ void Group::showGroupBalances() {
         string memberName = member ? member->name : memberID;
 
         cout << memberName << "'s balances in group: " << endl;
+        // pair.second is an inner map for one member.
+        // It contains that member's pairwise balances with others.
         auto userBalances = pair.second;
         if (userBalances.empty()) {
             cout << " No outstanding balances" << endl;
@@ -350,12 +397,14 @@ void Group::showGroupBalances() {
 }
 
 void Group::simplifyGroupDebts() {
+    // Replaces current debt graph with simplified equivalent graph.
     map<string, map<string, double>> simplifiedBalances = DebtSimplifier::simplifyDebt(groupBalances);
     groupBalances = simplifiedBalances;
     cout << "\nDebts have been simplified for group: " << name << endl;
 }
 
 Splitwise* Splitwise::getInstance() {
+    // Lazy singleton creation -> instance is only created when requested.
     if (instance == nullptr) {
         instance = new Splitwise();
     }
@@ -366,6 +415,7 @@ Splitwise::Splitwise() {}
 
 User* Splitwise::createUser(string name, string email) {
     User* user = new User(name, email);
+    // users map: key=userID, value=User object pointer.
     users[user->userID] = user;
     cout << "User created: " << name << " (ID: " << user->userID << ")" << endl;
     return user;
@@ -381,6 +431,7 @@ User* Splitwise::getUser(string userID) {
 
 Group* Splitwise::createGroup(string name) {
     Group* group = new Group(name);
+    // groups map: key=groupID, value=Group object pointer.
     groups[group->groupID] = group;
     cout << "Group created: " << name << " (ID: " << group->groupID << ")" << endl;
     return group;
@@ -444,6 +495,7 @@ void Splitwise::settleIndividualPayment(string fromUserID, string toUserID, doub
     User* fromUser = getUser(fromUserID);
     User* toUser = getUser(toUserID);
     if (fromUser && toUser) {
+        // User-level map balances are updated in opposite directions.
         fromUser->updateBalance(toUserID, amount);
         toUser->updateBalance(fromUserID, -amount);
         cout << fromUser->name << " settled Rs " << amount << " with " << toUser->name << endl;
@@ -451,11 +503,13 @@ void Splitwise::settleIndividualPayment(string fromUserID, string toUserID, doub
 }
 
 void Splitwise::addIndividualExpense(string description, double amount, string paidByUserID, string toUserID, SplitType splitType, vector<double> splitValues) {
+    // Reuse split strategy logic even for 2 users.
     SplitStrategy* strategy = SplitFactory::getSplitStrategy(splitType);
     vector<Split> splits = strategy->calculateSplit(amount, {paidByUserID, toUserID}, splitValues);
     delete strategy;
 
     Expense* expense = new Expense(description, amount, paidByUserID, splits, "", {paidByUserID, toUserID}, splitType, splitValues);
+    // expenses map stores non-group (individual) expenses.
     expenses[expense->expenseID] = expense;
 
     User* paidByUser = getUser(paidByUserID);
@@ -478,6 +532,7 @@ void Splitwise::showUserBalance(string userID) {
     cout << "Total others owe you: Rs " << fixed << setprecision(2) << user->getTotalOwing() << endl;
 
     cout << "Detailed balances: " << endl;
+    // user->balances map explains relationship with each other user.
     for (auto& balance : user->balances) {
         User* otherUser = getUser(balance.first);
         if (otherUser) {
@@ -508,15 +563,19 @@ void Splitwise::saveToFile(string fileName) {
         throw runtime_error("Unable to open file for saving");
     }
 
+    // File header/version marker.
     out << "SPLITWISE_V1\n";
+    // Save static counters so ID continuity is preserved after loading.
     out << User::nextUserID << " " << Group::nextGroupID << " " << Expense::nextExpenseID << "\n";
 
+    // Save all users from users map.
     out << users.size() << "\n";
     for (auto& pair : users) {
         User* user = pair.second;
         out << quoted(user->userID) << " " << quoted(user->name) << " " << quoted(user->email) << "\n";
     }
 
+    // Save groups and member IDs (not full user objects).
     out << groups.size() << "\n";
     for (auto& pair : groups) {
         Group* group = pair.second;
@@ -528,6 +587,7 @@ void Splitwise::saveToFile(string fileName) {
     }
 
     vector<Expense*> allExpenses;
+    // Combine group expenses and individual expenses into one list for storage.
     for (auto& pair : groups) {
         Group* group = pair.second;
         for (auto& expensePair : group->groupExpenses) {
@@ -560,12 +620,14 @@ void Splitwise::loadFromFile(string fileName) {
         throw runtime_error("Unable to open file for loading");
     }
 
+    // Validate header to ensure correct file format.
     string header;
     in >> header;
     if (header != "SPLITWISE_V1") {
         throw runtime_error("Invalid file format");
     }
 
+    // Clear old in-memory data before loading new data.
     for (auto& pair : users) delete pair.second;
     for (auto& pair : groups) delete pair.second;
     for (auto& pair : expenses) delete pair.second;
@@ -573,11 +635,13 @@ void Splitwise::loadFromFile(string fileName) {
     groups.clear();
     expenses.clear();
 
+    // Restore ID counters exactly as saved.
     int savedNextUserID = 0;
     int savedNextGroupID = 0;
     int savedNextExpenseID = 0;
     in >> savedNextUserID >> savedNextGroupID >> savedNextExpenseID;
 
+    // Recreate users map.
     size_t userCount = 0;
     in >> userCount;
     for (int i = 0; i < static_cast<int>(userCount); ++i) {
@@ -588,6 +652,7 @@ void Splitwise::loadFromFile(string fileName) {
         users[userID] = user;
     }
 
+    // Recreate groups and reconnect members by user IDs.
     size_t groupCount = 0;
     in >> groupCount;
     for (int i = 0; i < static_cast<int>(groupCount); ++i) {
@@ -610,6 +675,7 @@ void Splitwise::loadFromFile(string fileName) {
         }
     }
 
+    // Recreate each expense and rebuild balances by replaying split effects.
     size_t expenseCount = 0;
     in >> expenseCount;
     for (int i = 0; i < static_cast<int>(expenseCount); ++i) {

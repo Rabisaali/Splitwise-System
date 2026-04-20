@@ -16,8 +16,11 @@ using namespace std;
 
 class Splitwise {
 private:
+    // users map: quick lookup of user objects by user ID.
     map<string, User*> users;
+    // groups map: quick lookup of group objects by group ID.
     map<string, Group*> groups;
+    // expenses map: stores individual (non-group) expenses by expense ID.
     map<string, Expense*> expenses;
     static Splitwise* instance;
 

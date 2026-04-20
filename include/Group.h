@@ -21,7 +21,12 @@ public:
     string groupID;
     string name;
     vector<User*> members;
+    // Stores all expenses that belong to this group.
+    // key = expense ID, value = expense object pointer.
     map<string, Expense*> groupExpenses;
+    // Nested map that stores pairwise balances inside the group.
+    // groupBalances[A][B] represents money relation between A and B.
+    // This structure helps quickly update or read debts per member pair.
     map<string, map<string, double>> groupBalances;
 
     Group(string name);
