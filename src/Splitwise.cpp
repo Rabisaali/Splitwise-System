@@ -369,30 +369,28 @@ bool Group::settlePayment(string fromUserID, string toUserID, double amount) {
 
 void Group::showGroupBalances() {
     cout << "\n--- Group Balances for " << name << " ---" << endl;
+    bool hasOutstanding = false;
     for (auto& pair : groupBalances) {
         string memberID = pair.first;
         User* member = getUserByUserID(memberID);
         string memberName = member ? member->name : memberID;
 
-        cout << memberName << "'s balances in group: " << endl;
-        // pair.second is an inner map for one member.
-        // It contains that member's pairwise balances with others.
-        auto userBalances = pair.second;
-        if (userBalances.empty()) {
-            cout << " No outstanding balances" << endl;
-        } else {
-            for (auto& userBalance : userBalances) {
-                string otherMemberUserID = userBalance.first;
-                User* otherMember = getUserByUserID(otherMemberUserID);
-                string otherName = otherMember ? otherMember->name : otherMemberUserID;
-                double balance = userBalance.second;
-                if (balance > 0) {
-                    cout << " " << otherName << " owes: Rs " << fixed << setprecision(2) << balance << endl;
-                } else {
-                    cout << " owes " << otherName << ": Rs " << fixed << setprecision(2) << abs(balance) << endl;
-                }
+        for (auto& userBalance : pair.second) {
+            double balance = userBalance.second;
+            if (balance <= EPS) {
+                continue;
             }
+
+            hasOutstanding = true;
+            string otherMemberUserID = userBalance.first;
+            User* otherMember = getUserByUserID(otherMemberUserID);
+            string otherName = otherMember ? otherMember->name : otherMemberUserID;
+            cout << " " << otherName << " owes " << memberName << ": Rs " << fixed << setprecision(2) << balance << endl;
         }
+    }
+
+    if (!hasOutstanding) {
+        cout << " No outstanding balances" << endl;
     }
 }
 
@@ -527,19 +525,50 @@ void Splitwise::showUserBalance(string userID) {
     User* user = getUser(userID);
     if (!user) return;
 
+    map<string, double> combinedBalances = user->balances;
+    for (auto& groupPair : groups) {
+        Group* group = groupPair.second;
+        if (!group->isMember(userID)) {
+            continue;
+        }
+
+        map<string, double> groupBalances = group->getUserGroupBalances(userID);
+        for (auto& balance : groupBalances) {
+            combinedBalances[balance.first] += balance.second;
+            if (abs(combinedBalances[balance.first]) < EPS) {
+                combinedBalances.erase(balance.first);
+            }
+        }
+    }
+
+    double totalOwed = 0.0;
+    double totalOwing = 0.0;
+    for (const auto& balance : combinedBalances) {
+        if (balance.second < 0) {
+            totalOwed += abs(balance.second);
+        } else if (balance.second > 0) {
+            totalOwing += balance.second;
+        }
+    }
+
     cout << endl << "---------- Balance for " << user->name << " ----------" << endl;
-    cout << "Total you owe: Rs " << fixed << setprecision(2) << user->getTotalOwed() << endl;
-    cout << "Total others owe you: Rs " << fixed << setprecision(2) << user->getTotalOwing() << endl;
+    cout << "Total you owe: Rs " << fixed << setprecision(2) << totalOwed << endl;
+    cout << "Total others owe you: Rs " << fixed << setprecision(2) << totalOwing << endl;
 
     cout << "Detailed balances: " << endl;
-    // user->balances map explains relationship with each other user.
-    for (auto& balance : user->balances) {
+    if (combinedBalances.empty()) {
+        cout << " No outstanding balances" << endl;
+        return;
+    }
+
+    // combinedBalances includes both individual and group-level balances.
+    for (auto& balance : combinedBalances) {
         User* otherUser = getUser(balance.first);
         if (otherUser) {
             if (balance.second > 0) {
-                cout << " " << otherUser->name << " owes you: Rs " << balance.second << endl;
+                cout << " " << otherUser->name << " owes you: Rs " << fixed << setprecision(2) << balance.second << endl;
             } else {
-                cout << " You owe " << otherUser->name << ": Rs " << abs(balance.second) << endl;
+                cout << " You owe " << otherUser->name << ": Rs " << fixed << setprecision(2) << abs(balance.second) << endl;
             }
         }
     }
