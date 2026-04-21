@@ -361,8 +361,26 @@ bool Group::settlePayment(string fromUserID, string toUserID, double amount) {
         return false;
     }
 
-    // Settlement directly adjusts pairwise balances.
-    updateGroupBalance(fromUserID, toUserID, amount);
+    if (amount <= 0.0) {
+        cout << "Settlement amount must be positive" << endl;
+        return false;
+    }
+
+    // groupBalances[creditor][debtor] means debtor owes creditor.
+    // If fromUser pays toUser, then fromUser must owe toUser first.
+    const double currentDebt = groupBalances[toUserID][fromUserID];
+    if (currentDebt <= EPS) {
+        cout << fromUserID << " does not owe " << toUserID << " in this group" << endl;
+        return false;
+    }
+
+    if (amount - currentDebt > EPS) {
+        cout << "Settlement amount exceeds outstanding debt (Rs " << fixed << setprecision(2) << currentDebt << ")" << endl;
+        return false;
+    }
+
+    // Reduce debt: fromUser pays toUser.
+    updateGroupBalance(toUserID, fromUserID, -amount);
     notifyMembers("Settlement made: " + fromUserID + " paid " + toUserID + " Rs " + to_string(amount));
     return true;
 }
