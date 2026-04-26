@@ -9,7 +9,7 @@
 #include <stdexcept>
 
 using namespace std;
-
+//keeps the implementation private to this file to avoid name clashes and all
 namespace {
 // Small tolerance used for floating-point comparisons.
 // Example: 99.999 and 100.000 are treated as equal within this margin.
